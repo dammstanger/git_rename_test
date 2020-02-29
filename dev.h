@@ -1,131 +1,114 @@
-T1 
-void device_init()
-{
-    // Initial system clock.
-    InitSysCtrl();
+/*
+ * adis.h
+ *
+ * Copyright (C) Hefei Sunwin Intelligent Co., Ltd. - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ *
+ *  Created on: 2016Äê4ÔÂ15ÈÕ
+ *      Author: Qiuyang Wang <wangqiuyang@siwill.com>
+ */
+#ifndef SW_FC_HW04_CPU2_NEW_DRIVERS_ADIS_H_
+#define SW_FC_HW04_CPU2_NEW_DRIVERS_ADIS_H_
 
-    // Give control of partial GS memory to cpu2, matched with cmd file.
-    EALLOW;
-        MemCfgRegs.GSxMSEL.bit.MSEL_GS10 = 1;
-        MemCfgRegs.GSxMSEL.bit.MSEL_GS11 = 1;
-        MemCfgRegs.GSxMSEL.bit.MSEL_GS12 = 1;
-        MemCfgRegs.GSxMSEL.bit.MSEL_GS13 = 1;
-        MemCfgRegs.GSxMSEL.bit.MSEL_GS15 = 1;
-    EDIS;
+#include "../../library/math/AP_Math.h"
 
-    // Give control of partial prepheral to cpu2.
-    EALLOW;
-        DevCfgRegs.CPUSEL0.bit.EPWM7 = 1;
-        DevCfgRegs.CPUSEL0.bit.EPWM8 = 1;
-        DevCfgRegs.CPUSEL5.bit.SCI_A = 1;
-        DevCfgRegs.CPUSEL5.bit.SCI_D = 1;
-        DevCfgRegs.CPUSEL6.bit.SPI_B = 1;
-        DevCfgRegs.CPUSEL7.bit.I2C_A = 1;
-        DevCfgRegs.CPUSEL11.bit.ADC_B = 1;
-        DevCfgRegs.CPUSEL8.bit.CAN_A = 1;
-    EDIS;
+typedef struct{
+    Uint32 timestamp;
+    Uint16 resv;
+    Uint16 status;
+    int16 gyro[3];
+    int16 accel[3];
+    int16 temp;
+    int16 time_stmp;
+    Uint16 checksum;
+}ADISDataRaw;
 
-//    IPCBootCPU2(C1C2_BROM_BOOTMODE_BOOT_FROM_FLASH);
+typedef struct{
+    Uint32 timestamp;
+    float32 gyro[3];
+    float32 accel[3];
+    Vector3f mag;
+    float32 baro;
+    float32 altitude;
+    float32 temp;
+}ADISDataEng;
 
-    // GPIO initialization. Only call it in CPU1.
-    InitGpio();
-    util_led_init_gpio();
-    util_i2ca_init_gpio(); // Baro on cpu2
-    util_scia_init_gpio(); // Receive RTK data on cpu2
-    util_scib_init_gpio(); // SBus
-    util_scic_init_gpio(); // Send RTCM data to RTK
-    util_epwm_init_gpio();
-    util_spib_init_gpio(); // ADIS on cpu2
-    util_spic_init_gpio(); // eeprom/flash/gd
+typedef enum{
+    ADIS_FLASH_CNT      = 0x0000,  //Flash memory write count
+    ADIS_DIAG_STAT      = 0x0200,  //Diagnostic and operational status
+    ADIS_X_GYRO_LOW     = 0x0400,  //X-axis gyroscope output, lower word
+    ADIS_X_GYRO_OUT     = 0x0600,  //X-axis gyroscope output, upper word
+    ADIS_Y_GYRO_LOW     = 0x0800,  //Y-axis gyroscope output, lower word
+    ADIS_Y_GYRO_OUT     = 0x0A00,  //Y-axis gyroscope output, upper word
+    ADIS_Z_GYRO_LOW     = 0x0C00,  //Z-axis gyroscope output, lower word
+    ADIS_Z_GYRO_OUT     = 0x0E00,  //Z-axis gyroscope output, upper word
+    ADIS_X_ACCL_LOW     = 0x1000,  //X-axis accelerometer output, lower word
+    ADIS_X_ACCL_OUT     = 0x1200,  //X-axis accelerometer output, upper word
+    ADIS_Y_ACCL_LOW     = 0x1400,  //Y-axis accelerometer output, lower word
+    ADIS_Y_ACCL_OUT     = 0x1600,  //Y-axis accelerometer output, upper word
+    ADIS_Z_ACCL_LOW     = 0x1800,  //Z-axis accelerometer output, lower word
+    ADIS_Z_ACCL_OUT     = 0x1A00,  //Z-axis accelerometer output, upper word
+    ADIS_TEMP_OUT       = 0x1C00,  //Temperature output (internal, not calibrated)
+    ADIS_TIME_STAMP     = 0x1E00,  //PPS mode time stamp
+    ADIS_DATA_CNTR      = 0x2200,  //New data counter
+    ADIS_X_DELTANG_LOW  = 0x2400,  //X-axis delta angle output, lower word
+    ADIS_X_DELTANG_OUT  = 0x2600,  //X-axis delta angle output, upper word
+    ADIS_Y_DELTANG_LOW  = 0x2800,  //Y-axis delta angle output, lower word
+    ADIS_Y_DELTANG_OUT  = 0x2A00,  //Y-axis delta angle output, upper word
+    ADIS_Z_DELTANG_LOW  = 0x2C00,  //Z-axis delta angle output, lower word
+    ADIS_Z_DELTANG_OUT  = 0x2E00,  //Z-axis delta angle output, upper word
+    ADIS_X_DELTVEL_LOW  = 0x3000,  //X-axis delta velocity output, lower word
+    ADIS_X_DELTVEL_OUT  = 0x3200,  //X-axis delta velocity output, upper word
+    ADIS_Y_DELTVEL_LOW  = 0x3400,  //Y-axis delta velocity output, lower word
+    ADIS_Y_DELTVEL_OUT  = 0x3600,  //Y-axis delta velocity output, upper word
+    ADIS_Z_DELTVEL_LOW  = 0x3800,  //Z-axis delta velocity output, lower word
+    ADIS_Z_DELTVEL_OUT  = 0x3A00,  //Z-axis delta velocity output, upper word
+    ADIS_XG_BIAS_LOW    = 0x4000,  //X-axis gyroscope bias offset correction, lower word
+    ADIS_XG_BIAS_HIGH   = 0x4200,  //X-axis gyroscope bias offset correction, upper word
+    ADIS_YG_BIAS_LOW    = 0x4400,  //Y-axis gyroscope bias offset correction, lower word
+    ADIS_YG_BIAS_HIGH   = 0x4600,  //Y-axis gyroscope bias offset correction, upper word
+    ADIS_ZG_BIAS_LOW    = 0x4800,  //Z-axis gyroscope bias offset correction, lower word
+    ADIS_ZG_BIAS_HIGH   = 0x4A00,  //Z-axis gyroscope bias offset correction, upper word
+    ADIS_XA_BIAS_LOW    = 0x4C00,  //X-axis accelerometer bias offset correction, lower word
+    ADIS_XA_BIAS_HIGH   = 0x4E00,  //X-axis accelerometer bias offset correction, upper word
+    ADIS_YA_BIAS_LOW    = 0x5000,  //Y-axis accelerometer bias offset correction, lower word
+    ADIS_YA_BIAS_HIGH   = 0x5200,  //Y-axis accelerometer bias offset correction, upper word
+    ADIS_ZA_BIAS_LOW    = 0x5400,  //Z-axis accelerometer bias offset correction, lower word
+    ADIS_ZA_BIAS_HIGH   = 0x5600,  //Z-axis accelerometer bias offset correction, upper word
+    ADIS_FILT_CTRL      = 0x5C00,  //Filter control
+    ADIS_MSC_CTRL       = 0x6000,  //Miscellaneous control
+    ADIS_UP_SCALE       = 0x6200,  //Clock scale factor, PPS mode
+    ADIS_DEC_RATE       = 0x6400,  //Decimation rate control (output data rate)
+    ADIS_NULL_CFG       = 0x6600,  //Auto-null configuration control
+    ADIS_GLOB_CMD       = 0x6800,  //Global commands
+    ADIS_FIRM_REV       = 0x6C00,  //Firmware revision
+    ADIS_FIRM_DM        = 0x6E00,  //Firmware revision date, month and day
+    ADIS_FIRM_Y         = 0x7000,  //Firmware revision date, year
+    ADIS_PROD_ID        = 0x7200,  //Product identification
+    ADIS_SERIAL_NUM     = 0x7400,  //Serial number (relative to assembly lot)
+    ADIS_USER_SCR1      = 0x7600,  //User scratch register 1
+    ADIS_USER_SCR2      = 0x7800,  //User scratch register 2
+    ADIS_USER_SCR3      = 0x7A00,  //User scratch register 3
+    ADIS_FLSHCNT_LOW    = 0x7C00,  //Flash update count, lower word
+    ADIS_FLSHCNT_HIGH   = 0x7E00   //Flash update count, upper word
+}AdisRegister;
 
-    // Disable CPU interrupts
-    DINT;
-    // Initialize the PIE control registers to their default state.
-    InitPieCtrl();
+extern ADISDataRaw adis_data_raw;
+extern ADISDataEng adis_data_eng;
+extern ADISDataEng adis_data_eng_t;
 
-    // Disable CPU interrupts and clear all CPU interrupt flags.
-    IER = 0x0000;
-    IFR = 0x0000;
-    // Initialize the PIE vector table with pointers to the shell Interrupt.
-    InitPieVectTable();
+Uint16 adis_reset();
+Uint16 adis_hardware_reset();
+Uint16 adis_hardware_reset_noRTOS();
+Uint16 adis_selfTest();
+Uint16 adis_regRead(Uint16 addr);
+Uint16 adis_regWrite(Uint16 addr, Uint16 data);
+Uint16 adis_burstRead();
+bool adis_burstRead(Uint16 *buf);
+void adis_convert();
+void adis_regDefault(void);
+Uint16 adis_checksum(Uint16 * burstArray);
 
-    // Regist isr callback functions.
-    EALLOW;
-        PieVectTable.TIMER0_INT = &clock_tick_isr;      // CPU timer0 interrupt
-        PieVectTable.SPIC_RX_INT = &spic_rx_fifo_isr;   // SPIC rx interrupt
-        PieVectTable.SPIC_TX_INT = &spic_tx_fifo_isr;   // SPIC tx interrupt
-        PieVectTable.SCIC_RX_INT = &scic_rx_fifo_isr;   // SCIC rx interrupt
-        PieVectTable.SCIC_TX_INT = &scic_tx_fifo_isr;   // SCIC tx interrupt
-        PieVectTable.SCIB_RX_INT = &sbus_rx_fifo_isr;   // SCIB rx interrupt
-        PieVectTable.EPWM1_INT = &epwm_1_isr;           // EPWM 1 interrupt
-        PieVectTable.IPC0_INT = &CPU02toCPU01IPC0IntHandler;
-        PieVectTable.IPC1_INT = &CPU02toCPU01IPC1IntHandler;
-    EDIS;
 
-    // Init modules required by setup procedure.
-    clock_init();
-    clock_tick_start();
-    spic_init();
-    ipc_init();
-    emif1_init();
-
-    // Enable all interrupts.
-    IER |= M_INT1;                      // Enable group 1 interrupts (timer0 
-& ipc0 ipc1 ipc2 & xint1)
-    IER |= M_INT3;                      // Enable group 3 interrupts (epwm1)
-    IER |= M_INT6;                      // Enable group 6 interrupts (spic & 
-spia)
-    IER |= M_INT8;                      // Enable group 8 interrupts (scic & 
-scid)
-    IER |= M_INT9;                      // Enable group 9 interrupts (scia & 
-scib)
-
-    // Enable PIE interrupts.
-    PieCtrlRegs.PIEIER1.bit.INTx7 = 1;      // CPU timer0 ISR
-    PieCtrlRegs.PIEIER1.bit.INTx13 = 1;     // CPU1toCPU2 IPC INT0
-    PieCtrlRegs.PIEIER1.bit.INTx14 = 1;     // CPU2toCPU1 IPC INT1
-    PieCtrlRegs.PIEIER1.bit.INTx15 = 1;     // CPU2toCPU1 IPC INT2
-    PieCtrlRegs.PIEIER3.bit.INTx1 = 1;      // EPWM 1
-    PieCtrlRegs.PIEIER6.bit.INTx1 = 1;      // Enable PIE Group 6, INT 1[SPIA 
-Receive Interrupt]
-    PieCtrlRegs.PIEIER6.bit.INTx2 = 1;      // Enable PIE Group 6, INT 2[SPIA 
-Transmit Interrupt]
-    PieCtrlRegs.PIEIER6.bit.INTx9 = 1;      // SPIC rx
-    PieCtrlRegs.PIEIER6.bit.INTx10 = 1;     // SPIC tx
-    PieCtrlRegs.PIEIER8.bit.INTx5 = 1;      // SCIC rx
-    PieCtrlRegs.PIEIER8.bit.INTx6 = 1;      // SCIC tx
-    PieCtrlRegs.PIEIER9.bit.INTx3 = 1;      // SCIB rx
-
-    // Enable global interrupts and higher priority real-time debug events.
-    EnableInterrupts();
-
-    //
-    ipc_cpu1_wait_cpu2();
-
-    //* Setup
-    PosControl_init();
-
-    // Read eeprom load configuration.
-    config_restore();
-
-    // Read eeprom load parameters and initialize.
-    parameters_restore();
-    pid_init(&pid_pitch,MAIN_LOOP_SEC,&parameters.pid_pitch);
-    pid_init(&pid_roll,MAIN_LOOP_SEC,&parameters.pid_roll);
-    pid_init(&pid_yaw,MAIN_LOOP_SEC,&parameters.pid_yaw);
-    pid_init(&_pid_accel_z,MAIN_LOOP_SEC,&parameters.pid_accel_z);
-    pi2D_init(&_pi_vel_xy,WPNAV_LOITER_UPDATE_TIME,&parameters.pi_vel_xy);
-
-    motor_init();
-    motor_matrix_init();
-    attitude_init();
-    ahrs_data_init();
-
-    scic_init(CPU_FREQ,115200);
-    sbus_init(CPU_FREQ,100000);
-    epwm_init(CPU_FREQ/2,IPC_FREQ);//See InitSysPll
-    scrap_init();
-    IPCLtoRDataTransfer(&g_sIpcController1, pulMsgRam[6], pusCPU01BufferPt,
-                        &config, sizeof(Configuration), ENABLE_BLOCKING);
-}
-
+#endif /* SW_FC_HW04_CPU2_NEW_DRIVERS_ADIS_H_ */
