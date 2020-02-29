@@ -10,7 +10,6 @@
 #include "../library/motors/motor.h"
 #include "../library/pid/pid.h"
 
-#include "clock.h"
 #include "config.h"
 #include "epwm.h"
 #include "giganandflash.h"
