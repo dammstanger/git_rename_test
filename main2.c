@@ -1,8 +1,4 @@
-/*
- * main.c CPU-01
- */
-
-#include "fc_cpu1.h"
+#include "fc_cpu1"
 
 #include "sram/DualPortedRAM.h"
 #include "../library/ControlLib/attitude.h"
