@@ -2,8 +2,6 @@
  * main.c CPU-01
  */
 
-#include "fc_cpu1.h"
-
 #include "sram/DualPortedRAM.h"
 #include "../library/ControlLib/attitude.h"
 #include "../library/logger/log_read.h"
